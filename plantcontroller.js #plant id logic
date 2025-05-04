@@ -1,0 +1,72 @@
+const FormData = require('form-data');
+const fetch = require('node-fetch');
+
+// List of known invasive plants (store in DB for production)
+const INVASIVE_PLANTS = [
+  'kudzu', 'Japanese knotweed', 'purple loosestrife',
+  'giant hogweed', 'English ivy', 'water hyacinth'
+];
+
+exports.identifyPlant = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image uploaded' });
+    }
+
+    const formData = new FormData();
+    formData.append('images', req.file.buffer, {
+      filename: 'plant.jpg',
+      contentType: req.file.mimetype
+    });
+    formData.append('api_key', process.env.PLANT_ID_API_KEY);
+    formData.append('plant_details', 'common_names,url,wiki_description');
+
+    const response = await fetch('https://api.plant.id/v2/identify', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const processedResults = processPlantData(data);
+    
+    res.json(processedResults);
+  } catch (error) {
+    console.error('Identification error:', error);
+    res.status(500).json({ error: 'Plant identification failed' });
+  }
+};
+
+function processPlantData(apiData) {
+  if (!apiData.suggestions || apiData.suggestions.length === 0) {
+    return { error: 'No plants identified' };
+  }
+
+  const results = apiData.suggestions.map(suggestion => {
+    const commonNames = suggestion.plant_details?.common_names || [];
+    const isInvasive = checkIfInvasive(suggestion.plant_name, commonNames);
+    
+    return {
+      name: suggestion.plant_name,
+      probability: suggestion.probability,
+      isInvasive,
+      details: {
+        description: suggestion.plant_details?.wiki_description?.value,
+        url: suggestion.plant_details?.url,
+        commonNames
+      }
+    };
+  });
+
+  return { results };
+}
+
+function checkIfInvasive(name, commonNames = []) {
+  const allNames = [name.toLowerCase(), ...commonNames.map(n => n.toLowerCase())];
+  return INVASIVE_PLANTS.some(invasive => 
+    allNames.some(name => name.includes(invasive.toLowerCase()))
+  );
+}

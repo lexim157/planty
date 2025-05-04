@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invasive Plant Detector</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1><i class="fas fa-leaf"></i> Invasive Plant Detector</h1>
+    
+    <!-- Camera Feed -->
+    <div class="camera-container">
+      <video id="camera-feed" autoplay playsinline></video>
+      <canvas id="photo-canvas" style="display:none;"></canvas>
+    </div>
+    
+    <!-- Controls -->
+    <div class="controls">
+      <button id="capture-btn"><i class="fas fa-camera"></i> Capture</button>
+      <button id="upload-btn" disabled><i class="fas fa-cloud-upload-alt"></i> Identify</button>
+      <input type="file" id="file-input" accept="image/*" style="display:none;">
+    </div>
+    
+    <!-- Results -->
+    <div id="results" class="hidden">
+      <h2>Identification Results</h2>
+      <div id="plant-info"></div>
+    </div>
+    
+    <!-- Loading Spinner -->
+    <div id="loading" class="hidden">
+      <div class="spinner"></div>
+      <p>Analyzing plant...</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
