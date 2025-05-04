@@ -1,0 +1,141 @@
+// app.js - Main application logic
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM Elements
+    const uploadForm = document.getElementById('upload-form');
+    const fileInput = document.getElementById('plant-image');
+    const previewImage = document.getElementById('preview-image');
+    const identifyBtn = document.getElementById('identify-btn');
+    const resultsContainer = document.getElementById('results');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const apiKey = 'M6d9v7oFq1KA8UK4OzxJE6asv8P6v4qeqbrNtBwG5IDpYxMP5z'; // Replace with your actual API key
+
+    // Event Listeners
+    fileInput.addEventListener('change', handleImageUpload);
+    uploadForm.addEventListener('submit', handleFormSubmit);
+
+    // Handle image upload and preview
+    function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                previewImage.style.display = 'block';
+                identifyBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // Handle form submission
+    function handleFormSubmit(event) {
+        event.preventDefault();
+        
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        identifyPlant(file);
+    }
+
+    // Identify plant using Plant.id API
+    async function identifyPlant(imageFile) {
+        showLoading(true);
+        clearResults();
+
+        const formData = new FormData();
+        formData.append('images', imageFile);
+        formData.append('api_key', apiKey);
+        
+        // Additional parameters for better identification
+        formData.append('plant_details', 'common_names,url,wiki_description,taxonomy');
+        formData.append('disease_details', 'common_names,url,description');
+
+        try {
+            const response = await fetch('https://api.plant.id/v2/identify', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+
+            const data = await response.json();
+            displayResults(data);
+        } catch (error) {
+            console.error('Error identifying plant:', error);
+            displayError('Failed to identify plant. Please try again.');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // Display identification results
+    function displayResults(data) {
+        if (!data.suggestions || data.suggestions.length === 0) {
+            displayError('No plants identified. Try a clearer image.');
+            return;
+        }
+
+        // List of known invasive plants (would be better from a database)
+        const invasivePlants = [
+            'kudzu', 'Japanese knotweed', 'purple loosestrife', 
+            'giant hogweed', 'English ivy', 'water hyacinth'
+        ];
+
+        const resultsHTML = data.suggestions.map(suggestion => {
+            const isInvasive = invasivePlants.some(invasive => 
+                suggestion.plant_name.toLowerCase().includes(invasive.toLowerCase()) ||
+                (suggestion.plant_details.common_names && 
+                 suggestion.plant_details.common_names.some(name => 
+                    invasivePlants.some(invasive => name.toLowerCase().includes(invasive.toLowerCase()))
+                )
+            );
+
+            return `
+                <div class="result-card ${isInvasive ? 'invasive' : ''}">
+                    <h3>${suggestion.plant_name}</h3>
+                    <p class="probability">Probability: ${(suggestion.probability * 100).toFixed(1)}%</p>
+                    
+                    ${isInvasive ? 
+                        '<div class="warning-banner"><i class="fas fa-exclamation-triangle"></i> Invasive Species</div>' : 
+                        '<div class="safe-banner"><i class="fas fa-check-circle"></i> Not Invasive</div>'
+                    }
+                    
+                    ${suggestion.plant_details.common_names ? 
+                        `<p><strong>Common names:</strong> ${suggestion.plant_details.common_names.join(', ')}</p>` : ''
+                    }
+                    
+                    ${suggestion.plant_details.wiki_description ? 
+                        `<div class="description">${suggestion.plant_details.wiki_description.value}</div>` : ''
+                    }
+                    
+                    ${suggestion.plant_details.url ? 
+                        `<a href="${suggestion.plant_details.url}" target="_blank" class="learn-more">Learn more</a>` : ''
+                    }
+                </div>
+            `;
+        }).join('');
+
+        resultsContainer.innerHTML = resultsHTML;
+    }
+
+    // Helper functions
+    function showLoading(show) {
+        loadingSpinner.style.display = show ? 'block' : 'none';
+        identifyBtn.disabled = show;
+    }
+
+    function clearResults() {
+        resultsContainer.innerHTML = '';
+    }
+
+    function displayError(message) {
+        resultsContainer.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>${message}</p>
+            </div>
+        `;
+    }
+});
